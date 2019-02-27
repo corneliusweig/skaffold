@@ -48,6 +48,8 @@ func NewCmdSet(out io.Writer) *cobra.Command {
 }
 
 func setConfigValue(name string, value string) error {
+	// initialize the kubecontext
+	ResolveKubectlContext("")
 	cfg, err := getOrCreateConfigForKubectx()
 	if err != nil {
 		return err

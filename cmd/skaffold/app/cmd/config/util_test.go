@@ -51,7 +51,7 @@ func TestGetKubeContext(t *testing.T) {
 			defer restore()
 		}
 
-		actual, err := GetKubeContext(test.schemaContext)
+		actual, err := GetKubeContextAfterInitilization(test.schemaContext)
 		testutil.CheckErrorAndDeepEqual(t, test.shouldErr, err, test.expected, actual)
 	}
 }
