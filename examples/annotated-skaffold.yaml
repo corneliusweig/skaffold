@@ -164,6 +164,9 @@ test:
 deploy:
   # The type of the deployment method can be `kubectl` (beta), `helm` (beta) or `kustomize` (beta).
 
+  # The kubectl context to be used. Defaults to your current kubectl context.
+  # context: staging
+
   # The kubectl deployer uses  a client side `kubectl apply` to apply the manifests to the cluster.
   # You'll need a kubectl CLI version installed that's compatible with your cluster.
   kubectl:

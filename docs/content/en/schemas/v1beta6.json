@@ -378,6 +378,11 @@
       "description": "a list of structure tests to run on images that Skaffold builds."
     },
     "DeployConfig": {
+      "properties": {
+        "context": {
+          "type": "string"
+        }
+      },
       "additionalProperties": false,
       "anyOf": [
         {
