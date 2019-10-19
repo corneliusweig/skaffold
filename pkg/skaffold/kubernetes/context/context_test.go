@@ -62,13 +62,17 @@ kind: Config
 clusters:
 - cluster:
     server: https://changed-url.com
-  name: cluster-bar
+  name: some-cluster
 contexts:
 - context:
-    cluster: cluster-bar
-    user: user1
+    cluster: some-cluster
+    user: user-bar
   name: cluster-bar
-current-context: cluster-foo
+- context:
+    cluster: some-cluster
+    user: user-baz
+  name: cluster-baz
+current-context: cluster-baz
 users:
 - name: user1
   user:
@@ -76,64 +80,32 @@ users:
     username: user
 `
 
-func TestCurrentContext(t *testing.T) {
-	testutil.Run(t, "valid context", func(t *testutil.T) {
-		resetKubeConfig(t, validKubeConfig)
-
-		err := LoadKubeConfig("", "")
-		t.CheckNoError(err)
-
-		cfg, _ := CurrentConfig()
-		t.CheckDeepEqual(clusterFooContext, cfg.CurrentContext)
-	})
-
-	testutil.Run(t, "valid with override context", func(t *testutil.T) {
-		resetKubeConfig(t, validKubeConfig)
-
-		err := LoadKubeConfig("", "cluster-bar")
-		t.CheckNoError(err)
-
-		cfg, _ := CurrentConfig()
-		t.CheckDeepEqual(clusterBarContext, cfg.CurrentContext)
-	})
-
+func TestLoadKubeConfig(t *testing.T) {
 	testutil.Run(t, "invalid context", func(t *testutil.T) {
 		resetKubeConfig(t, "invalid")
 
-		err := LoadKubeConfig("", "")
+		err := LoadKubeConfig("", "", "")
 
 		t.CheckError(true, err)
 	})
-}
 
-func TestGetRestClientConfig(t *testing.T) {
-	testutil.Run(t, "valid context", func(t *testutil.T) {
+	testutil.Run(t, "kubeconfig CLI flag takes precedence", func(t *testutil.T) {
 		resetKubeConfig(t, validKubeConfig)
+		kubeConfigFile := t.TempFile("config", []byte(changedKubeConfig))
 
-		err := LoadKubeConfig("", "")
+		err := LoadKubeConfig("", "", kubeConfigFile)
 		t.CheckNoError(err)
 
-		cfg, _ := GetRestClientConfig()
-		t.CheckDeepEqual("https://foo.com", cfg.Host)
-	})
-
-	testutil.Run(t, "valid context with override", func(t *testutil.T) {
-		resetKubeConfig(t, validKubeConfig)
-
-		err := LoadKubeConfig(clusterBarContext, "")
-		t.CheckNoError(err)
-
-		cfg, _ := GetRestClientConfig()
-		t.CheckDeepEqual("https://bar.com", cfg.Host)
+		cfg, _ := CurrentConfig()
+		t.CheckDeepEqual("cluster-baz", cfg.CurrentContext)
 	})
 
 	testutil.Run(t, "kube-config immutability", func(t *testutil.T) {
 		logrus.SetLevel(logrus.InfoLevel)
 		kubeConfig := t.TempFile("config", []byte(validKubeConfig))
-		t.SetEnvs(map[string]string{"KUBECONFIG": kubeConfig})
 		kubeConfigOnce = sync.Once{}
 
-		err := LoadKubeConfig("", clusterBarContext)
+		err := LoadKubeConfig("", clusterBarContext, kubeConfig)
 		t.CheckNoError(err)
 
 		cfg, _ := GetRestClientConfig()
@@ -143,7 +115,7 @@ func TestGetRestClientConfig(t *testing.T) {
 			t.Error(err)
 		}
 
-		err = LoadKubeConfig("", clusterBarContext)
+		err = LoadKubeConfig("", clusterBarContext, kubeConfig)
 		t.CheckNoError(err)
 
 		cfg, _ = GetRestClientConfig()
@@ -155,7 +127,7 @@ func TestGetRestClientConfig(t *testing.T) {
 		t.SetEnvs(map[string]string{"KUBECONFIG": "non-valid"})
 		kubeConfigOnce = sync.Once{}
 
-		err := LoadKubeConfig("", "")
+		err := LoadKubeConfig("", "", "")
 
 		if err == nil {
 			t.Errorf("expected error outside the cluster")
@@ -163,7 +135,51 @@ func TestGetRestClientConfig(t *testing.T) {
 	})
 }
 
-func TestUseKubeContext(t *testing.T) {
+func TestCurrentContext(t *testing.T) {
+	testutil.Run(t, "valid context", func(t *testutil.T) {
+		resetKubeConfig(t, validKubeConfig)
+
+		err := LoadKubeConfig("", "", "")
+		t.CheckNoError(err)
+
+		cfg, _ := CurrentConfig()
+		t.CheckDeepEqual(clusterFooContext, cfg.CurrentContext)
+	})
+
+	testutil.Run(t, "valid context with override", func(t *testutil.T) {
+		resetKubeConfig(t, validKubeConfig)
+
+		err := LoadKubeConfig("", clusterBarContext, "")
+		t.CheckNoError(err)
+
+		cfg, _ := CurrentConfig()
+		t.CheckDeepEqual(clusterBarContext, cfg.CurrentContext)
+	})
+}
+
+func TestGetRestClientConfig(t *testing.T) {
+	testutil.Run(t, "valid context", func(t *testutil.T) {
+		resetKubeConfig(t, validKubeConfig)
+
+		err := LoadKubeConfig("", "", "")
+		t.CheckNoError(err)
+
+		cfg, _ := GetRestClientConfig()
+		t.CheckDeepEqual("https://foo.com", cfg.Host)
+	})
+
+	testutil.Run(t, "valid context with override", func(t *testutil.T) {
+		resetKubeConfig(t, validKubeConfig)
+
+		err := LoadKubeConfig(clusterBarContext, "", "")
+		t.CheckNoError(err)
+
+		cfg, _ := GetRestClientConfig()
+		t.CheckDeepEqual("https://bar.com", cfg.Host)
+	})
+}
+
+func TestLoadKubeConfig_argumentPrecedence(t *testing.T) {
 	type invocation struct {
 		cliValue, yamlValue string
 	}
@@ -241,7 +257,7 @@ func TestUseKubeContext(t *testing.T) {
 		testutil.Run(t, test.name, func(t *testutil.T) {
 			resetKubeConfig(t, validKubeConfig)
 			for _, inv := range test.invocations {
-				if err := LoadKubeConfig(inv.yamlValue, inv.cliValue); err != nil {
+				if err := LoadKubeConfig(inv.yamlValue, inv.cliValue, ""); err != nil {
 					t.Error(err)
 				}
 			}

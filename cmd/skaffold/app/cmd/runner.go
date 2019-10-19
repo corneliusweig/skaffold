@@ -72,7 +72,7 @@ func createNewRunner(opts config.SkaffoldOptions) (runner.Runner, *latest.Skaffo
 		return nil, nil, errors.Wrap(err, "applying profiles")
 	}
 
-	if err := kubectx.LoadKubeConfig(config.Deploy.KubeContext, opts.KubeContext); err != nil {
+	if err := kubectx.LoadKubeConfig(config.Deploy.KubeContext, opts.KubeContext, opts.KubeConfig); err != nil {
 		return nil, nil, errors.Wrap(err, "loading kubeconfig")
 	}
 

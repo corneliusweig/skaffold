@@ -37,7 +37,7 @@ var (
 	restConfig     *restclient.Config
 )
 
-func LoadKubeConfig(yamlKubeContext, cliKubeContext string) error {
+func LoadKubeConfig(yamlKubeContext, cliKubeContext, cliKubeConfig string) error {
 	var err error
 	kubeContext := yamlKubeContext
 	if cliKubeContext != "" {
@@ -51,12 +51,13 @@ func LoadKubeConfig(yamlKubeContext, cliKubeContext string) error {
 		}
 
 		loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+		loadingRules.ExplicitPath = cliKubeConfig
 
 		cfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{
 			CurrentContext: kubeContext,
 		})
 
-		if restConfig, err = getRestConfig(cfg, kubeContext); err != nil {
+		if restConfig, err = getRestConfig(cfg, kubeContext, cliKubeConfig); err != nil {
 			return
 		}
 
@@ -84,9 +85,9 @@ func getCurrentConfig() (clientcmdapi.Config, error) {
 	return kubeConfig, nil
 }
 
-func getRestConfig(cfg clientcmd.ClientConfig, kctx string) (*restclient.Config, error) {
+func getRestConfig(cfg clientcmd.ClientConfig, kctx, kcfg string) (*restclient.Config, error) {
 	restConfig, err := cfg.ClientConfig()
-	if kctx == "" && clientcmd.IsEmptyConfig(err) {
+	if kctx == "" && kcfg == "" && clientcmd.IsEmptyConfig(err) {
 		logrus.Debug("no kube-context set and no kubeConfig found, attempting in-cluster config")
 		restConfig, err := restclient.InClusterConfig()
 		return restConfig, errors.Wrap(err, "error creating REST client config in-cluster")
